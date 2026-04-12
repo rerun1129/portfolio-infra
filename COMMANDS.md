@@ -21,7 +21,7 @@ terraform init
 
 ---
 
-## 전체 Apply (모든 리소스 생성)
+## 전체 Apply (EC2 + RDS 생성)
 
 ```bash
 terraform apply -auto-approve
@@ -32,16 +32,18 @@ terraform apply -auto-approve
 terraform plan
 ```
 
+> EIP, CloudFront는 이미 올라가 있어 변경 없음. EC2, RDS가 주요 생성 대상.
 > **Apply 후 수동 작업 필요** → [POST-APPLY-CHECKLIST.md](../POST-APPLY-CHECKLIST.md) 확인
 
 ---
 
-## 전체 Destroy (모든 리소스 삭제)
+## 전체 Destroy (EC2 + RDS 삭제)
 
-> 주의: 관리 중인 모든 리소스가 삭제됩니다.
+> EIP와 CloudFront는 `prevent_destroy = true` — `terraform destroy`로 삭제되지 않음.
+> 아래 명령으로 EC2, RDS만 내려감.
 
 ```bash
-terraform destroy -auto-approve
+terraform destroy -target=aws_eip_association.main -target=aws_instance.main -target=aws_db_instance.main -auto-approve
 ```
 
 ---
