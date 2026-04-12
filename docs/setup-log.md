@@ -298,12 +298,92 @@ GitHub (Next.js)
 
 | 리소스 | 값 |
 |--------|-----|
-| EC2 EIP | 52.78.180.13 |
+| ~~EC2 EIP~~ | ~~52.78.180.13~~ → **release됨** (새로 발급 후 import 필요) |
 | RDS 엔드포인트 | todolist-db.cdqpv9e2voky.ap-northeast-2.rds.amazonaws.com |
 | CloudFront 도메인 | https://dzcf5t1ap5pg3.cloudfront.net |
 | CloudFront Distribution ID | EQ5G8LNMI2WQL |
 | CloudFront OAC ID | E1U6N248Y73X1I |
 | S3 버킷 | todolist-dev-rerun1129 |
+| Terraform state | s3://todolist-dev-rerun1129/tfstate/dev/terraform.tfstate |
 | Amplify 앱 ID | d3iprkvplk2uky |
 | Amplify URL | https://master.d3iprkvplk2uky.amplifyapp.com |
 | IAM Role ARN | arn:aws:iam::740636428516:role/portfolio-terraform-role |
+
+---
+
+## 13. 현재 인프라 상태 (세션 종료 시점 기준)
+
+**실행 중 (과금 중):**
+- CloudFront (EQ5G8LNMI2WQL) — `prevent_destroy`, 월 ~$0-1
+- S3 버킷 (todolist-dev-rerun1129) — 월 ~$0
+
+**내려간 상태 (코드는 유지):**
+- EC2 — destroy됨
+- RDS — destroy됨
+- EIP — release됨 (다음 EC2 올릴 때 새로 발급 필요)
+
+**월 예상 과금:** ~$0-1 (CloudFront + S3만)
+
+---
+
+## 14. EIP release 결정
+
+**Q. EIP를 계속 들고 있어야 할까?**
+
+2024년 2월부터 AWS는 미연결 EIP에도 $0.005/시간 과금 → 월 $3.60. EC2가 내려가 있는 동안 불필요한 비용이므로 release.
+
+**다음에 EC2를 올릴 때:**
+1. AWS 콘솔에서 EIP 새로 발급 → 할당 ID(`eipalloc-xxx`) 확인
+2. `terraform import aws_eip.main <eipalloc-xxx>`
+3. `terraform apply -target=aws_cloudfront_distribution.main -auto-approve` — CloudFront origin IP 업데이트
+4. EC2에 EIP 연결: `terraform apply -target=aws_instance.main -target=aws_eip_association.main -auto-approve`
+
+> CloudFront origin이 `aws_eip.main.public_ip`를 참조하므로, EIP가 바뀌면 CloudFront apply도 함께 필요.
+
+---
+
+## 15. S3 백엔드 설정 (멀티 컴퓨터 작업)
+
+**Q. 여러 컴퓨터에서 동일한 Terraform 프로젝트를 작업하려면?**
+
+`terraform.tfstate`가 로컬에만 있으면 다른 컴퓨터에서 state를 알 수 없어 apply/destroy가 불가능하다. S3 백엔드를 설정해 state를 S3에 저장하면 어느 컴퓨터에서든 동일한 state로 작업 가능.
+
+설정된 백엔드 (`environments/dev/main.tf`):
+```hcl
+backend "s3" {
+  bucket  = "todolist-dev-rerun1129"
+  key     = "tfstate/dev/terraform.tfstate"
+  region  = "ap-northeast-2"
+  profile = "portfolio"
+
+  assume_role = {
+    role_arn = "arn:aws:iam::740636428516:role/portfolio-terraform-role"
+  }
+}
+```
+
+**다른 컴퓨터에서 시작하는 방법:**
+```bash
+git clone https://github.com/rerun1129/portfolio-infra.git
+cd portfolio-infra/environments/dev
+
+# ~/.aws/credentials에 [portfolio] 프로파일 설정 필요
+terraform init   # S3에서 최신 state 자동으로 가져옴
+terraform plan   # 현재 상태 확인
+```
+
+**Q. terraform.tfstate가 git에 올라가지 않나?**
+
+`.gitignore`에 `*.tfstate`가 등록되어 있어 git에는 올라가지 않는다. S3가 유일한 저장소.
+
+---
+
+## 16. 다른 컴퓨터에서 이어 작업 시 체크리스트
+
+새 컴퓨터에서 이 프로젝트를 처음 사용할 때:
+
+- [ ] `git clone https://github.com/rerun1129/portfolio-infra.git`
+- [ ] `~/.aws/credentials`에 `[portfolio]` 프로파일 추가 (Access Key는 별도 보관)
+- [ ] `cd environments/dev && terraform init` — S3 state 연결 확인
+- [ ] `terraform plan` — 현재 AWS 상태와 코드 일치 여부 확인
+- [ ] EC2를 올릴 예정이면 EIP 신규 발급 후 Claude에게 알릴 것 (import + CloudFront 업데이트 필요)

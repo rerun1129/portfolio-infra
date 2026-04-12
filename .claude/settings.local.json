@@ -7,7 +7,8 @@
       "Bash(export TF_VAR_db_password=\"qaz12345\")",
       "Bash(terraform import:*)",
       "Bash(terraform plan:*)",
-      "Bash(terraform destroy:*)"
+      "Bash(terraform destroy:*)",
+      "Bash(terraform init:*)"
     ]
   }
 }
