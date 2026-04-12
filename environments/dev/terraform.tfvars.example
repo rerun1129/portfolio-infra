@@ -1,0 +1,31 @@
+# ================================================================
+# 새 프로젝트 시작 시 이 파일을 terraform.tfvars로 복사 후 수정
+# ================================================================
+
+# 공통
+aws_region   = "ap-northeast-2"
+iam_role_arn = "arn:aws:iam::740636428516:role/portfolio-terraform-role"
+
+# 프로젝트 (반드시 수정)
+project_name = "<프로젝트명>"          # 예: myblog, portfolio, shop
+vpc_id       = "vpc-0b5ea269fea455d52" # 계정 default VPC (동일 계정이면 그대로 사용)
+
+# EC2 (반드시 수정)
+ec2_key_name     = "<프로젝트명>-ec2-key" # AWS 콘솔에서 생성한 키 페어 이름
+ssh_allowed_cidr = "<내 IP>/32"           # 예: 1.2.3.4/32 (확인: https://ifconfig.me)
+
+# EC2 (선택 수정 - 기본값 그대로 써도 됨)
+ec2_ami           = "ami-0ada8527e6dc686a3" # Amazon Linux 2023 (서울)
+ec2_instance_type = "t3.micro"
+app_port          = 8080
+
+# S3 (반드시 수정)
+s3_bucket_name = "<버킷명>"  # CloudFront S3 origin으로 사용할 버킷 이름
+
+# RDS (선택 수정 - 기본값 그대로 써도 됨)
+db_instance_class     = "db.t3.micro"
+db_engine_version     = "18.3"
+rds_security_group_id = "sg-0df35a4a18482821d" # 계정 default VPC 보안 그룹
+
+# db_password는 환경변수로 전달 (파일에 기록하지 말 것)
+# export TF_VAR_db_password="패스워드"
