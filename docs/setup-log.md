@@ -387,3 +387,128 @@ terraform plan   # 현재 상태 확인
 - [ ] `cd environments/dev && terraform init` — S3 state 연결 확인
 - [ ] `terraform plan` — 현재 AWS 상태와 코드 일치 여부 확인
 - [ ] EC2를 올릴 예정이면 EIP 신규 발급 후 Claude에게 알릴 것 (import + CloudFront 업데이트 필요)
+
+---
+
+## 17. 과금 분석 및 비용 최적화 (2026-04-13)
+
+**Q. 어제(4/12) $0.45 과금 내역 분석**
+
+| 서비스 | 금액 | 원인 |
+|--------|------|------|
+| RDS | $0.18 | db.t3.small 3시간 ($0.084) + gp2 스토리지 prorated ($0.09) |
+| Amplify | $0.10 | 빌드 시간 약 10분 (푸시 3~5회 × 2~3분) |
+| EC2 | $0.06 | 인스턴스 실행 시간 |
+| VPC | $0.06 | NAT Gateway 또는 데이터 전송 |
+| Tax | $0.05 | |
+
+**핵심 인사이트:**
+- RDS 비용은 인스턴스 타입이 지배적. 스토리지 크기(20GB→5GB) 조정은 3시간 기준 $0.009 절감으로 효과 미미
+- Amplify는 빌드(푸시)할 때만 과금. 서비스 존재만으로는 스토리지 비용 월 $0.002/앱 수준
+- EC2/RDS 내려간 현재 상태로 4월 말까지 유지 시 월 예상액 ~$0.50
+
+**Q. RDS 인스턴스 타입 확인 필요**
+
+현재 db.t3.small($0.056/hr)로 추정. db.t3.micro($0.028/hr)로 낮추면 세션당 비용 절반.
+
+---
+
+## 18. AWS Budgets 알람 설정
+
+**기존 예산 `My Non-Commercial Project` 수정:**
+- 예산 금액: $50 → **$5**
+- 알람 1: 실제 비용 60% ($3) 초과 시 → `a01021719359@gmail.com`
+- 알람 2: 예측 비용 100% ($5) 초과 시 → `a01021719359@gmail.com`
+
+월별 예산 + 2단계 알람 구조가 일별 예산보다 효과적. 일별은 작업 세션마다 오탐 발생.
+
+---
+
+## 19. Route 53 도메인 및 nextcraft 인프라
+
+**도메인:** `nextcraft.click` (Route 53, $3/년, .click TLD)
+- 호스팅 영역: $0.50/월 고정 과금 → 유지 필수 (삭제 시 NS 변경됨)
+- 상태: 등록 진행 중 (완료 후 Amplify 커스텀 도메인 연결 예정)
+
+**Amplify 커스텀 도메인 연결 절차 (도메인 등록 완료 후):**
+1. Amplify 콘솔 → 앱(`d3iprkvplk2uky`) → App settings → Custom domains
+2. `nextcraft.click` 추가
+3. Route 53 레코드 자동 생성 확인 (같은 계정이면 자동)
+4. SSL 인증서 자동 발급 확인
+
+---
+
+## 20. S3 퍼블릭 버킷 생성 (nextcraft-portfolio-assets)
+
+**목적:** nextcraft 포트폴리오용 `projects.json` 퍼블릭 호스팅
+
+| 항목 | 값 |
+|------|-----|
+| 버킷 이름 | `nextcraft-portfolio-assets` |
+| 리전 | `ap-northeast-2` |
+| 퍼블릭 URL | `https://nextcraft-portfolio-assets.s3.ap-northeast-2.amazonaws.com/projects.json` |
+
+**Bucket Policy** (projects.json 단일 파일만 퍼블릭, 보안):
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": "*",
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::nextcraft-portfolio-assets/projects.json"
+  }]
+}
+```
+
+**CORS:**
+```json
+[{
+  "AllowedHeaders": ["*"],
+  "AllowedMethods": ["GET"],
+  "AllowedOrigins": [
+    "https://nextcraft.click",
+    "https://www.nextcraft.click"
+  ],
+  "MaxAgeSeconds": 3600
+}]
+```
+
+`/*` 대신 특정 파일만 허용하는 정책으로 민감 데이터 실수 업로드 방지.
+
+---
+
+## 21. 현재 인프라 상태 (2026-04-13 기준)
+
+**실행 중 (과금 중):**
+- CloudFront (EQ5G8LNMI2WQL) — `prevent_destroy`, 월 ~$0-1
+- S3 버킷 (todolist-dev-rerun1129) — Terraform state 보관, 월 ~$0
+- S3 버킷 (nextcraft-portfolio-assets) — 신규 생성, 월 ~$0
+- Route 53 호스팅 영역 (nextcraft.click) — $0.50/월
+- Amplify (d3iprkvplk2uky) — 빌드 시만 과금
+
+**내려간 상태 (코드는 유지):**
+- EC2 — destroy됨
+- RDS — destroy됨
+- EIP — release됨
+
+**월 예상 과금:** ~$0.50-1.00 (Route 53 호스팅 영역 $0.50 추가됨)
+
+---
+
+## 22. 주요 리소스 정보 (업데이트)
+
+| 리소스 | 값 |
+|--------|-----|
+| EC2 EIP | release됨 (새로 발급 후 import 필요) |
+| RDS 엔드포인트 | todolist-db.cdqpv9e2voky.ap-northeast-2.rds.amazonaws.com |
+| CloudFront 도메인 | https://dzcf5t1ap5pg3.cloudfront.net |
+| CloudFront Distribution ID | EQ5G8LNMI2WQL |
+| CloudFront OAC ID | E1U6N248Y73X1I |
+| S3 버킷 (todolist) | todolist-dev-rerun1129 |
+| S3 버킷 (nextcraft) | nextcraft-portfolio-assets |
+| Terraform state | s3://todolist-dev-rerun1129/tfstate/dev/terraform.tfstate |
+| Amplify 앱 ID | d3iprkvplk2uky |
+| Amplify URL | https://master.d3iprkvplk2uky.amplifyapp.com |
+| IAM Role ARN | arn:aws:iam::740636428516:role/portfolio-terraform-role |
+| 도메인 | nextcraft.click (Route 53, 등록 진행 중) |
