@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git -C \"$CLAUDE_PROJECT_DIR\" status --porcelain | grep -q . && echo '{\"systemMessage\": \"git 적용 사항 존재함\"}' || true"
+          }
+        ]
+      }
+    ]
+  }
+}

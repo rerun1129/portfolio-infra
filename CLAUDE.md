@@ -1,8 +1,10 @@
 # portfolio-infra Claude 운영 규칙
 
-## 메모리 로드
+## 메모리
 
-작업 시작 시 `.claude/memory/` 디렉토리의 모든 파일을 읽어 프로젝트 컨텍스트를 로드하세요.
+- **저장 위치:** 프로젝트 repo 내 `.claude/memory/` (예: `D:\vive_coding\portfolio-infra\.claude\memory\`)
+- 시스템 기본 경로(`~/.claude/projects/.../memory/`)는 사용하지 않는다
+- 작업 시작 시 `.claude/memory/` 디렉토리의 모든 파일을 읽어 프로젝트 컨텍스트를 로드하세요
 
 ## 프로젝트 개요
 
@@ -12,10 +14,10 @@ Terraform으로 AWS 인프라를 관리하는 프로젝트.
 ## 핸드오프
 
 ### 파일 위치
-```
-C:\저장소\vive-coding\obsidian-vault\rerun\.handoff\HAND-OFF.md
-```
-> 절대 경로 prefix는 변경될 수 있음. suffix `\rerun\.handoff\HAND-OFF.md`는 불변.
+두 PC의 절대 경로를 순서대로 Read 시도. 첫 번째가 실패하면 두 번째 사용.
+
+- 회사 PC: `D:\vive_coding\vault-rerun\rerun\.handoff\HAND-OFF.md`
+- 집 PC:   `C:\저장소\vive-coding\obsidian-vault\rerun\.handoff\HAND-OFF.md`
 
 ### 쓰기 규칙
 - **HAND-OFF.md**: 읽기 + 쓰기 허용 (다른 프로젝트 파일 중 유일한 쓰기 허용)
