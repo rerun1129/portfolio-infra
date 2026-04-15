@@ -30,11 +30,21 @@ Terraform으로 AWS 인프라를 관리하는 프로젝트.
 
 ## 서브 에이전트
 
-| 에이전트 | 역할 | 도구 |
-|----------|------|------|
-| `infra-explorer` | 파일 탐색, 설정값 확인 (읽기 전용) | Read, Glob, Grep |
-| `infra-modifier` | Terraform/문서 파일 수정 | Read, Edit, Write, Glob, Grep |
-| `infra-reviewer` | 코드 리뷰, 보안 점검 (읽기 전용) | Read, Glob, Grep |
+### 공통 에이전트
+
+| 에이전트 | 역할 | 사용 시점 |
+|----------|------|----------|
+| **Explore** (`infra-explorer`) | 코드베이스 탐색 전용 — Terraform 파일 검색, 설정값 확인. **웹서치 금지** | 구현 전 현황 파악이 필요할 때 |
+| **web-searcher** | 웹서치 전담 — AWS 공식 문서, Terraform 레퍼런스 검색 | 외부 자료 조사가 필요할 때 |
+| **infra-modifier** | 파일 쓰기 전용 — 승인된 계획 실행 | Main Claude가 계획 확정 후 위임 |
+| **infra-reviewer** | 코드 리뷰, 보안 점검 (읽기 전용) | 중요 변경 후 2차 검증 필요 시 |
+
+**흐름:** infra-explorer(코드 조사) + web-searcher(웹서치) 병렬 → Main Claude(계획 + 사용자 승인) → infra-modifier(실행)
+
+### 공통 원칙
+- 탐색 결과는 Main Claude가 직접 종합 — "결과 보고 판단해줘" 방식으로 위임 금지
+- 코드 조사와 웹서치가 동시에 필요한 경우 두 에이전트를 병렬로 스폰
+- 에이전트 결과가 사용자에게 직접 노출되지 않으므로, 중요 내용은 Main Claude가 요약해서 전달
 
 ## 현재 인프라 상태
 
