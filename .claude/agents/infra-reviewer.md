@@ -34,14 +34,14 @@ model: sonnet
 
 ## 프로젝트 구조 참고
 
-```
-environments/dev/main.tf       # 주요 리소스
-environments/dev/variables.tf  # 변수 선언
-environments/dev/outputs.tf    # 출력값
-.gitignore                     # terraform.tfvars 포함 여부 확인
-docs/aws-services/             # 서비스별 문서
-COMMANDS.md                    # 명령어 가이드
-```
+정적 트리 대신 Glob/Grep으로 실시간 탐색한다. 주요 디렉토리 용도:
+
+| 디렉토리 | 용도 |
+|----------|------|
+| `environments/dev/` | Terraform 코드 (main.tf, variables.tf, outputs.tf 등) |
+| `docs/aws-services/` | AWS 서비스별 문서 |
+| `docs/` | setup-log, trouble-shooting 등 운영 문서 |
+| 루트 `*.md` | COMMANDS, BOILERPLATE, POST-APPLY-CHECKLIST 등 가이드 |
 
 ## 역할
 

@@ -9,27 +9,15 @@ model: haiku
 
 ## 프로젝트 구조
 
-```
-portfolio-infra/
-├── environments/dev/
-│   ├── main.tf              # 리소스 정의 (EC2, RDS, CloudFront, EIP, SG)
-│   ├── variables.tf         # 변수 선언
-│   ├── terraform.tfvars     # 실제 값 (git 제외)
-│   ├── terraform.tfvars.example  # 새 프로젝트용 템플릿
-│   └── outputs.tf           # 출력값
-├── docs/
-│   ├── aws-services/        # AWS 서비스별 문서
-│   │   ├── ec2.md
-│   │   ├── rds.md
-│   │   ├── cloudfront.md
-│   │   ├── s3.md
-│   │   ├── amplify.md
-│   │   └── iam.md
-│   └── setup-log.md         # 세션별 작업 이력
-├── COMMANDS.md              # Terraform 명령어 가이드
-├── BOILERPLATE.md           # 새 프로젝트 시작 가이드
-└── POST-APPLY-CHECKLIST.md  # Apply 후 수동 작업 체크리스트
-```
+정적 트리 대신 Glob/Grep으로 실시간 탐색한다. 주요 디렉토리 용도:
+
+| 디렉토리 | 용도 |
+|----------|------|
+| `environments/dev/` | Terraform 코드 (main.tf, variables.tf, outputs.tf 등) |
+| `docs/aws-services/` | AWS 서비스별 문서 |
+| `docs/` | setup-log, trouble-shooting 등 운영 문서 |
+| `connection-info/` | DB 접속 정보 등 |
+| 루트 `*.md` | COMMANDS, BOILERPLATE, POST-APPLY-CHECKLIST 등 가이드 |
 
 ## 주요 리소스명 패턴
 
