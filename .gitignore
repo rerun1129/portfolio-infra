@@ -16,5 +16,5 @@ terraform.tfvars
 .claude/settings.local.json
 *.tfvars.json
 secrets.tfvars
-accesskey/
-connection-info/
+aws-credentials/
+infra-secrets/

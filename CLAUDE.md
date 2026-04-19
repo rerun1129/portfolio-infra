@@ -11,23 +11,6 @@
 Terraform으로 AWS 인프라를 관리하는 프로젝트.
 현재 환경: `environments/dev/`
 
-## 핸드오프
-
-### 파일 위치
-두 PC의 절대 경로를 순서대로 Read 시도. 첫 번째가 실패하면 두 번째 사용.
-
-- 회사 PC: `D:\vive_coding\vault-rerun\rerun\.handoff\HAND-OFF.md`
-- 집 PC:   `C:\저장소\vive-coding\obsidian-vault\rerun\.handoff\HAND-OFF.md`
-
-### 쓰기 규칙
-- **HAND-OFF.md**: 읽기 + 쓰기 허용 (다른 프로젝트 파일 중 유일한 쓰기 허용)
-- **다른 프로젝트의 나머지 파일**: 읽기 전용
-
-### 작업 시작 시
-1. HAND-OFF.md 읽기
-2. `[STATUS] infra` 섹션 현재 상태로 업데이트
-3. `[REQUEST] → infra` 섹션에 자신에게 온 요청 확인
-
 ## 서브 에이전트
 
 ### 공통 에이전트
@@ -44,6 +27,14 @@ Terraform으로 AWS 인프라를 관리하는 프로젝트.
 - 탐색 결과는 Main Claude가 직접 종합 — "결과 보고 판단해줘" 방식으로 위임 금지
 - 코드 조사와 웹서치가 동시에 필요한 경우 두 에이전트를 병렬로 스폰
 - 에이전트 결과가 사용자에게 직접 노출되지 않으므로, 중요 내용은 Main Claude가 요약해서 전달
+
+## 프로젝트 문서 참조 기준
+
+| 파일 | 참조 시점 |
+|------|----------|
+| `BOILERPLATE.md` | 새 프로젝트 시작 / 이 repo를 템플릿으로 쓸 때 |
+| `COMMANDS.md` | terraform apply·destroy 명령어를 물어볼 때 |
+| `POST-APPLY-CHECKLIST.md` | terraform apply 완료 직후 (특히 RDS·CloudFront 포함 시) |
 
 ## 현재 인프라 상태
 
