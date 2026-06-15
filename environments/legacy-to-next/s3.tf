@@ -24,6 +24,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "edms" {
   bucket = aws_s3_bucket.edms.id
 
   rule {
+    bucket_key_enabled = true # 실제 버킷이 켜둔 값 — 미선언 시 plan 이 true→null 드리프트로 잡음
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256" # SSE-S3 (KMS 아님 — 실측 확인됨)
     }

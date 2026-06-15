@@ -18,8 +18,10 @@ resource "aws_ecr_repository" "this" {
 }
 
 resource "aws_ecr_lifecycle_policy" "this" {
-  for_each   = aws_ecr_repository.this
-  repository = each.value.name
+  # 정적 repo 집합으로 키잉 — aws_ecr_repository.this 직접 참조는 첫 plan 에서
+  # "known only after apply" 오류. 키는 정적, repository 이름만 apply-time 참조.
+  for_each   = toset(local.ecr_repos)
+  repository = aws_ecr_repository.this[each.key].name
 
   policy = jsonencode({
     rules = [{

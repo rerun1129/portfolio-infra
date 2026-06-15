@@ -60,4 +60,6 @@ output "app_secret_arn" {
 output "amplify_default_domain" {
   description = "Amplify 기본 도메인 (토큰 제공 시)"
   value       = local.amplify_enabled ? aws_amplify_app.fe[0].default_domain : null
+  # amplify_enabled 가 sensitive 한 var.amplify_oauth_token 에서 파생 → 출력도 sensitive 표시 필요.
+  sensitive   = true
 }

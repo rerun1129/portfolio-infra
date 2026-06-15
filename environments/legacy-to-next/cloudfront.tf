@@ -16,17 +16,15 @@ resource "aws_acm_certificate" "api" {
 }
 
 resource "aws_route53_record" "api_cert_validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      record = dvo.resource_record_value
-    }
-  }
+  # 단일 도메인 cert — for_each 키는 정적(var 파생 local.api_domain)이어야 첫 plan/import 에서
+  # "Invalid for_each argument" 가 안 난다. domain_validation_options 는 apply 후에만 알 수 있어
+  # 키로 쓸 수 없고, 값(record 필드)만 apply-time 으로 채운다.
+  for_each = toset([local.api_domain])
+
   zone_id         = data.aws_route53_zone.main.zone_id
-  name            = each.value.name
-  type            = each.value.type
-  records         = [each.value.record]
+  name            = tolist(aws_acm_certificate.api.domain_validation_options)[0].resource_record_name
+  type            = tolist(aws_acm_certificate.api.domain_validation_options)[0].resource_record_type
+  records         = [tolist(aws_acm_certificate.api.domain_validation_options)[0].resource_record_value]
   ttl             = 60
   allow_overwrite = true
 }
