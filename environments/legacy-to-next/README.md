@@ -14,7 +14,12 @@ legacy-to-next(6컨테이너 물류 SaaS) AWS 배포. **todolist(`environments/d
 - Terraform ≥ 1.5, AWS CLI v2, Docker, `psql`(PostgreSQL 15+ 클라이언트)
 - `~/.aws` 에 `portfolio` 프로필(assume `portfolio-terraform-role` 가능)
 - (Amplify 자동연결 시) GitHub PAT → `export TF_VAR_amplify_oauth_token=<PAT>`
-- 시드 추출용으로 **기존 로컬 DB(2M 적재분)** 가 떠 있어야 함(앱 repo `docker compose up -d postgres`)
+
+> ⚠️ **실행 PC 분리 가능**: 시드 추출(sample_export.sql)은 **2M 소스 DB가 있는 PC**에서 실행한다
+> (현재 그 데이터는 *작업 PC*의 docker 볼륨 `legacy-to-next_postgres_data`에 있음 — `docker compose up -d postgres`로 기동).
+> terraform 실행 PC와 달라도 무방 — 산출 TSV는 **S3로 전달**(git 아님)되고 EC2가 S3에서 적재한다.
+> 추출 PC엔 업로드용 **aws CLI + portfolio 자격증명**만 있으면 됨(terraform 불요). 둘 다 없으면 sample_data/를
+> 파일 복사로 terraform PC에 옮겨 거기서 `aws s3 cp` 해도 됨.
 
 ## 0. 최초 1회 셋업
 ```bash
