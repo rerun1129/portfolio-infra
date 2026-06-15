@@ -1,0 +1,25 @@
+# ================================================================
+# legacy-to-next 환경 변수 예시. 필요 시 terraform.tfvars 로 복사 후 수정.
+# (대부분 variables.tf 에 기본값이 있어 비워도 동작)
+# ================================================================
+
+# 공통 / 식별 (기본값 존재 — 보통 수정 불요)
+# aws_region   = "ap-northeast-2"
+# iam_role_arn = "arn:aws:iam::740636428516:role/portfolio-terraform-role"
+# project_name = "legacy-to-next"
+
+# DNS (기존 호스팅 영역 — 도메인이 다르면 교체)
+# domain_name = "nextcraft.click"
+
+# S3 (기존 버킷 import 대상)
+# s3_bucket_name = "legacy-to-next"
+# s3_key_prefix  = "edms"
+
+# ----------------------------------------------------------------
+# Phase B 이후 추가될 변수(예: ec2_key_name, ssh_allowed_cidr, ec2_instance_type,
+# db_instance_class, db_engine_version 등)는 해당 Phase의 variables.tf 도입 시 함께 안내.
+#
+# RDS 마스터 비번은 파일에 쓰지 말고 환경변수로 전달:
+#   export TF_VAR_db_password="<긴 랜덤>"
+# (또는 Phase B에서 manage_master_user_password=true 로 Secrets Manager 자동관리)
+# ----------------------------------------------------------------

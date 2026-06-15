@@ -1,0 +1,90 @@
+#!/bin/bash
+# legacy-to-next EC2 부트스트랩 (Amazon Linux 2023)
+# Terraform templatefile: $${...}=Terraform 주입값, $VAR=쉘 변수.
+set -uxo pipefail
+exec > >(tee -a /var/log/user-data.log) 2>&1
+echo "=== user-data start $(date -u) ==="
+
+REGION="${aws_region}"
+ECR_REGISTRY="${ecr_registry}"
+RDS_ENDPOINT="${rds_endpoint}"
+
+# ---------- 1. 패키지 ----------
+dnf install -y docker jq postgresql15
+systemctl enable --now docker
+usermod -aG docker ec2-user || true
+
+# docker compose 플러그인(AL2023 기본 미포함)
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/download/v2.32.1/docker-compose-linux-x86_64" \
+  -o /usr/libexec/docker/cli-plugins/docker-compose
+chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+# ---------- 2. 시크릿 ----------
+MASTER_JSON=$(aws secretsmanager get-secret-value --secret-id "${rds_master_secret_arn}" --query SecretString --output text --region "$REGION")
+MASTER_PW=$(echo "$MASTER_JSON" | jq -r .password)
+APP_JSON=$(aws secretsmanager get-secret-value --secret-id "${app_secret_arn}" --query SecretString --output text --region "$REGION")
+DB_PASSWORD=$(echo "$APP_JSON" | jq -r .DB_PASSWORD)
+JWT_SECRET=$(echo "$APP_JSON" | jq -r .JWT_SECRET)
+INTERNAL_GATEWAY_KEY=$(echo "$APP_JSON" | jq -r .INTERNAL_GATEWAY_KEY)
+
+# ---------- 3. RDS 초기화 (pgcrypto는 admin Flyway보다 먼저 보장) ----------
+export PGCONNECT_TIMEOUT=10
+for i in $(seq 1 30); do
+  if PGPASSWORD="$MASTER_PW" pg_isready -h "$RDS_ENDPOINT" -U postgres; then break; fi
+  echo "waiting for RDS... ($i)"; sleep 10
+done
+
+export PGPASSWORD="$MASTER_PW"
+PSQL_M="psql -h $RDS_ENDPOINT -U postgres -v ON_ERROR_STOP=1"
+$PSQL_M -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='fms'" | grep -q 1 \
+  || $PSQL_M -d postgres -c "CREATE DATABASE fms"
+$PSQL_M -d fms -tc "SELECT 1 FROM pg_roles WHERE rolname='fms'" | grep -q 1 \
+  || $PSQL_M -d fms -c "CREATE ROLE fms LOGIN"
+$PSQL_M -d fms -c "ALTER ROLE fms WITH PASSWORD '$DB_PASSWORD'"
+$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS fms AUTHORIZATION fms"
+$PSQL_M -d fms -c "CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA fms"
+$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS admin AUTHORIZATION fms"
+$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS bms AUTHORIZATION fms"
+unset PGPASSWORD
+
+# ---------- 4. .env + 배포 번들 ----------
+mkdir -p /opt/app
+cat > /opt/app/.env <<EOF
+ECR_REGISTRY=${ecr_registry}
+RDS_ENDPOINT=${rds_endpoint}
+DB_PASSWORD=$DB_PASSWORD
+JWT_SECRET=$JWT_SECRET
+INTERNAL_GATEWAY_KEY=$INTERNAL_GATEWAY_KEY
+APP_ORIGIN=${app_origin}
+EOF
+chmod 600 /opt/app/.env
+
+aws s3 cp "s3://${s3_bucket}/${s3_deploy_prefix}/docker-compose.aws.yml" /opt/app/docker-compose.aws.yml --region "$REGION"
+# 시드 번들: sample_load.sql + sample_data/*.tsv (참조 슬라이스) 또는 demo_1k.sql (합성 폴백)
+aws s3 cp --recursive "s3://${s3_bucket}/${s3_deploy_prefix}/seed/" /opt/app/seed/ --region "$REGION" || echo "WARN: seed 번들 없음"
+
+# ---------- 5. compose up (순서·health) ----------
+cd /opt/app
+aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+docker compose -f docker-compose.aws.yml --env-file /opt/app/.env pull
+docker compose -f docker-compose.aws.yml --env-file /opt/app/.env up -d --wait --wait-timeout 600 || \
+  echo "WARN: compose --wait timed out; continuing"
+
+# ---------- 6. 시드 (Flyway 마이그레이션 후) — 참조 슬라이스 우선, 없으면 합성 폴백 ----------
+export PGPASSWORD="$DB_PASSWORD"
+cd /opt/app/seed 2>/dev/null || mkdir -p /opt/app/seed && cd /opt/app/seed
+if [ -f sample_load.sql ]; then
+  psql -h "$RDS_ENDPOINT" -U fms -d fms -v ON_ERROR_STOP=1 -f sample_load.sql \
+    && echo "sample seed OK" || echo "WARN: sample seed failed (행수/제약 확인)"
+elif [ -f demo_1k.sql ]; then
+  psql -h "$RDS_ENDPOINT" -U fms -d fms -v ON_ERROR_STOP=1 -f demo_1k.sql \
+    && echo "synthetic seed OK" || echo "WARN: synthetic seed failed"
+else
+  echo "WARN: 시드 파일 없음 — 빈 DB로 기동"
+fi
+cd /opt/app
+unset PGPASSWORD
+
+# PMS Mart는 1분 주기 증분 스케줄러가 시드된 source를 자동 반영(즉시 원하면 rebuild 엔드포인트 호출).
+echo "=== user-data done $(date -u) ==="
