@@ -24,7 +24,9 @@ legacy-to-next(6컨테이너 물류 SaaS) AWS 배포. **todolist(`environments/d
 ## 0. 최초 1회 셋업
 ```bash
 cd environments/legacy-to-next
-terraform init
+# 로컬 backend 인증은 partial config로 분리됨(CI/OIDC 이중화). 로컬은 아래 플래그 필수:
+terraform init -backend-config=backend.local.hcl
+#  (backend 설정 변경 후 첫 init이면 -reconfigure 추가: terraform init -reconfigure -backend-config=backend.local.hcl)
 
 # (a) 기존 S3 버킷 import — 재생성 아님
 terraform import aws_s3_bucket.edms legacy-to-next
@@ -70,6 +72,30 @@ terraform apply
 terraform destroy -target=aws_instance.main -target=aws_db_instance.main -target=aws_route53_record.origin
 ```
 종료 후 idle: Route53 존(기존)+Secrets($0.40)+ECR(~$0.3)+S3 ≈ **$1/mo 미만**, EC2/RDS=$0.
+
+> 쉘 대신 **GitHub Actions로도 가능**(아래 5절). spin-up=`Infra apply`, tear-down=`Infra destroy`.
+
+## 4-1. GitHub Actions CI/CD (4개 분리 아이템)
+쉘 terraform/수동 push 대신 Actions UI에서 클릭 운영. 작업이 4개로 분리돼 각각 독립 실행:
+
+| 아이템 | repo / 워크플로 | 트리거 | 역할(OIDC) |
+|--------|------------------|--------|------------|
+| **CI** | legacy-to-next `ci.yml` | push/PR(master)·dispatch | (없음) 빌드·테스트만 |
+| **CD** | legacy-to-next `deploy.yml` | dispatch(`modules`,`redeploy`)·`deploy-*` 태그 | `gha-ecr-push` → ECR push + SSM EC2 재배포 |
+| **apply** | portfolio-infra `infra-apply.yml` | dispatch(`mode=plan\|apply`, `confirm=APPLY`) | `gha-infra`(Administrator) |
+| **destroy** | portfolio-infra `infra-destroy.yml` | dispatch(`confirm=DESTROY`) | `gha-infra` — 컴퓨트만 targeted destroy |
+
+**부트스트랩(최초 1회, 로컬):** OIDC provider+역할이 없으면 CI가 인증할 수 없으므로 첫 생성은 로컬에서:
+```bash
+terraform init -backend-config=backend.local.hcl
+terraform apply -var enable_cicd_oidc=true   # OIDC provider + gha-ecr-push + gha-infra 생성
+```
+이후부터 apply/destroy/CD를 Actions에서 실행 가능.
+
+**사전 GitHub 시크릿(portfolio-infra repo):** `AMPLIFY_OAUTH_TOKEN` = GitHub PAT.
+미설정 시 `infra-apply`의 plan이 Amplify 삭제를 계획하고 apply 가드가 중단한다(안전장치).
+
+**운영 흐름:** `Infra apply`(mode=apply, confirm=APPLY)로 스택 up → 코드 변경 시 `CD`(또는 `deploy-*` 태그) → 끝나면 `Infra destroy`(confirm=DESTROY)로 컴퓨트 off.
 
 ## 3. 트러블슈팅
 - `engine_version 17.x` 미지원 오류 → `terraform apply -var db_engine_version=<유효버전>` (오류 메시지에 목록).

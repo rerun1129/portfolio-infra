@@ -9,9 +9,15 @@ variable "aws_region" {
 }
 
 variable "iam_role_arn" {
-  description = "Terraform이 assume할 IAM Role ARN (계정 고정값)"
+  description = "Terraform provider가 assume할 IAM Role ARN. 빈 문자열이면 assume 안 함(CI/OIDC 환경자격 직접 사용). 로컬 기본값 = portfolio-terraform-role."
   type        = string
   default     = "arn:aws:iam::740636428516:role/portfolio-terraform-role"
+}
+
+variable "aws_profile" {
+  description = "Terraform provider가 사용할 AWS 프로필. 빈 문자열이면 프로필 미지정(CI/OIDC 환경자격 직접 사용). 로컬 기본값 = portfolio."
+  type        = string
+  default     = "portfolio"
 }
 
 variable "project_name" {
@@ -166,9 +172,15 @@ variable "amplify_branch" {
 # ============================================================
 
 variable "github_repo" {
-  description = "OIDC 신뢰 대상 GitHub 저장소 (owner/repo)"
+  description = "OIDC 신뢰 대상 — 앱(이미지 push) GitHub 저장소 (owner/repo)"
   type        = string
   default     = "rerun1129/legacy-to-next"
+}
+
+variable "infra_github_repo" {
+  description = "OIDC 신뢰 대상 — 인프라(terraform lifecycle) GitHub 저장소 (owner/repo)"
+  type        = string
+  default     = "rerun1129/portfolio-infra"
 }
 
 variable "enable_cicd_oidc" {

@@ -1,0 +1,71 @@
+name: Infra destroy (legacy-to-next compute teardown)
+
+# EC2 + RDS + origin 레코드만 제거(컴퓨트 OFF → 변동비 $0).
+# 플랫폼(CloudFront·ACM·Amplify·ECR·S3·Secrets·OIDC 역할)은 유지.
+# confirm 입력에 'DESTROY' 필요.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "확인: 'DESTROY' 입력해야 진행"
+        type: string
+        default: ''
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: infra-legacy-to-next-lifecycle
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  TF_WORKDIR: environments/legacy-to-next
+  INFRA_ROLE: arn:aws:iam::740636428516:role/legacy-to-next-gha-infra
+  TF_VAR_aws_profile: ''
+  TF_VAR_iam_role_arn: ''
+  TF_VAR_enable_cicd_oidc: 'true'
+  TF_VAR_amplify_oauth_token: ${{ secrets.AMPLIFY_OAUTH_TOKEN }}
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKDIR }}
+    steps:
+      - name: Guard — require confirm=DESTROY
+        if: ${{ inputs.confirm != 'DESTROY' }}
+        run: |
+          echo "::error::destroy는 confirm 입력에 'DESTROY' 가 필요합니다 (받은 값: '${{ inputs.confirm }}')."
+          exit 1
+
+      - uses: actions/checkout@v6
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.8
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.INFRA_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform destroy (compute only)
+        run: |
+          terraform destroy -input=false -auto-approve \
+            -target=aws_instance.main \
+            -target=aws_db_instance.main \
+            -target=aws_route53_record.origin
+          {
+            echo "### Destroyed compute"
+            echo "- EC2(aws_instance.main) · RDS(aws_db_instance.main) · origin 레코드 제거"
+            echo "- 유지: CloudFront · ACM · Amplify · ECR · S3 · Secrets · OIDC 역할"
+          } >> "$GITHUB_STEP_SUMMARY"
