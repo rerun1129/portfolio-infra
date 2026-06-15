@@ -42,10 +42,17 @@ $PSQL_M -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='fms'" | grep -
 $PSQL_M -d fms -tc "SELECT 1 FROM pg_roles WHERE rolname='fms'" | grep -q 1 \
   || $PSQL_M -d fms -c "CREATE ROLE fms LOGIN"
 $PSQL_M -d fms -c "ALTER ROLE fms WITH PASSWORD '$DB_PASSWORD'"
-$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS fms AUTHORIZATION fms"
+# RDS 마스터(postgres)는 rds_superuser일 뿐 진짜 슈퍼유저가 아님 →
+#   (1) 'AUTHORIZATION fms' 는 must-be-member-of-role 로 실패하므로 제거(스키마는 postgres 소유로 생성)
+#   (2) fms 역할에 DB CREATE 권한이 없어 Flyway의 CREATE SCHEMA가 42501(permission denied)로 죽음
+#       → GRANT ALL ON DATABASE + 스키마 사전생성(Flyway가 '이미 존재'로 건너뜀) + 스키마 권한 부여
+$PSQL_M -d fms -c "GRANT ALL ON DATABASE fms TO fms"
+$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS fms"
 $PSQL_M -d fms -c "CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA fms"
-$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS admin AUTHORIZATION fms"
-$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS bms AUTHORIZATION fms"
+$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS admin"
+$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS bms"
+$PSQL_M -d fms -c "CREATE SCHEMA IF NOT EXISTS pms"
+$PSQL_M -d fms -c "GRANT ALL ON SCHEMA fms, admin, bms, pms TO fms"
 unset PGPASSWORD
 
 # ---------- 4. .env + 배포 번들 ----------

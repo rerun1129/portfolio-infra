@@ -30,6 +30,8 @@ resource "aws_amplify_app" "fe" {
           phases:
             preBuild:
               commands:
+                - nvm install 24
+                - nvm use 24
                 - npm ci
             build:
               commands:
