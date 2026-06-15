@@ -10,6 +10,10 @@ on:
         description: "확인: 'DESTROY' 입력해야 진행"
         type: string
         default: ''
+      purge_secret:
+        description: '앱 Secrets도 함께 삭제($0.40/mo 절약, 다음 apply가 새 값으로 재생성)'
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -58,14 +62,21 @@ jobs:
       - name: Terraform init
         run: terraform init -input=false
 
-      - name: Terraform destroy (compute only)
+      - name: Terraform destroy
         run: |
-          terraform destroy -input=false -auto-approve \
-            -target=aws_instance.main \
-            -target=aws_db_instance.main \
-            -target=aws_route53_record.origin
+          TARGETS="-target=aws_instance.main -target=aws_db_instance.main -target=aws_route53_record.origin"
+          EXTRA='유지: 앱 Secrets(~0.4/mo)'
+          if [ "${{ inputs.purge_secret }}" = "true" ]; then
+            # 앱 Secrets까지 제거. 이를 참조하는 ec2 inline 정책은 terraform이 의존성으로 함께 제거하며,
+            # 다음 apply가 Secrets(새 값)·정책·EC2를 모두 재생성하므로 재spin-up은 정상.
+            TARGETS="$TARGETS -target=aws_secretsmanager_secret_version.app -target=aws_secretsmanager_secret.app"
+            EXTRA='삭제: 앱 Secrets(다음 apply 시 새 값으로 재생성)'
+          fi
+          echo "targets: $TARGETS"
+          terraform destroy -input=false -auto-approve $TARGETS
           {
-            echo "### Destroyed compute"
-            echo "- EC2(aws_instance.main) · RDS(aws_db_instance.main) · origin 레코드 제거"
-            echo "- 유지: CloudFront · ACM · Amplify · ECR · S3 · Secrets · OIDC 역할"
+            echo "### Destroyed (compute teardown)"
+            echo "- 제거: EC2 · RDS · origin 레코드"
+            echo "- $EXTRA"
+            echo "- 유지: CloudFront · ACM · Amplify · ECR · S3 · OIDC 역할 · Route53 존"
           } >> "$GITHUB_STEP_SUMMARY"
